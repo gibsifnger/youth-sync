@@ -1,149 +1,244 @@
-# 📊 LH 정책 비정형 데이터 추출 모듈 (B 파트)
-
-> LH 정책 페이지의 비정형 데이터를 구조화하여 검색 및 추천 시스템에 활용 가능한 형태로 변환하는 모듈
+# 📄 LH 정책 데이터 수집 및 분석 파이프라인 정의서
 
 ---
 
-## 📌 1. 개요
+## 1. 프로젝트 개요
 
-본 모듈은 LH 홈페이지의 정책 설명 페이지를 대상으로  
-비정형 텍스트 데이터를 수집하고, 이를 구조화된 JSON 데이터로 변환하는 기능을 수행합니다.
+### 1.1 목적
 
-- 대상: LH 청년 주거 정책 페이지
-- 목적: 정책 정보를 분석하여 백엔드 및 검색 시스템에서 활용 가능한 데이터 생성
-
----
-
-## 📌 2. 주요 기능
-
-### 🔹 웹 페이지 수집
-
-- 특정 URL 패턴의 LH 정책 페이지 HTML 수집
-
-### 🔹 본문 텍스트 추출
-
-- HTML에서 정책 설명 영역만 추출
-
-### 🔹 청킹 (Chunking)
-
-- 텍스트를 의미 단위로 분리
-  - 입주대상
-  - 소득 기준
-  - 임대조건
-  - 거주기간
-  - 공급시기
-
-### 🔹 정보 추출
-
-- 연령 조건 (age_min, age_max)
-- 대상군 (청년, 대학생, 취업준비생 등)
-- 주택 조건 (무주택 등)
-- 소득 조건 (순위 기반 텍스트)
-- 임대 조건 (보증금, 임대료)
-- 거주 기간
-
-### 🔹 스키마 변환
-
-추출된 데이터를 아래 2가지 형태로 변환:
-
-- 정책 데이터 (policy_schema)
-- 청크 데이터 (chunk_schema)
+LH(한국토지주택공사) 홈페이지의 임대 및 정책 정보를 자동으로 수집하고,
+이를 정형화된 데이터로 변환하여 분석 및 서비스에 활용 가능한 형태로 구축하는 것을 목표로 한다.
 
 ---
 
-## 📌 3. 데이터 구조
+### 1.2 배경
 
-### 🔹 정책 데이터 (policy_schema)
+* LH 정책 정보는 웹 페이지 형태로 제공되어 데이터 활용이 어려움
+* 정책 변경 및 신규 공고 발생 시 수동 확인 필요
+* 자동화된 수집 및 변경 감지 시스템 필요
+
+---
+
+### 1.3 기대 효과
+
+* 정책 데이터 자동 수집 및 구조화
+* 신규 및 변경 정책 실시간 추적 가능
+* 향후 추천 시스템, 알림 서비스 등 확장 가능
+
+---
+
+## 2. 시스템 개요
+
+### 2.1 전체 구조
+
+```text
+[ LH 홈페이지 ]
+        ↓
+[ 크롤링 (fetcher) ]
+        ↓
+[ HTML 정제 및 분석 (pipeline) ]
+        ↓
+[ 데이터 추출 (extractor) ]
+        ↓
+[ 스키마 변환 (mapper) ]
+        ↓
+[ JSON 저장 + 변경 감지 ]
+        ↓
+[ (향후) DB / API / 알림 ]
+```
+
+---
+
+### 2.2 주요 구성 요소
+
+#### ① Fetcher
+
+* LH 웹 페이지 HTML 수집
+* 대상 URL: `menu.es` 기반 정책 페이지
+
+#### ② Pipeline
+
+* HTML → 텍스트 정제
+* 텍스트 chunk 분리
+* 정책 정보 추출 및 통합 처리
+
+#### ③ Extractor
+
+* 입주 대상
+* 소득 및 자산 기준
+* 임대 조건
+* 거주 기간
+* 공급 시기
+
+#### ④ Mapper
+
+* 정책 데이터 표준 스키마 변환
+* 카테고리 자동 분류
+* 지역 및 상태 자동 추론
+
+---
+
+## 3. 데이터 처리 흐름
+
+### 3.1 크롤링 단계
+
+* `depth4_menu_ul` 영역에서 정책 페이지 링크 추출
+* 각 링크에 대해 HTML 수집
+
+---
+
+### 3.2 데이터 정제 및 추출
+
+* HTML 태그 제거
+* 텍스트 구조 분리
+* 섹션 기반 정보 추출
+
+---
+
+### 3.3 데이터 구조화
+
+#### 정책 스키마 예시
 
 ```json
 {
-  "policy_id": "a10401020400",
-  "policy_name": "청년 전세임대주택",
+  "policy_id": "a10401020100",
+  "policy_name": "청년 행복주택 모집공고",
   "category": "주거",
-  "subcategory": "전세임대",
+  "subcategory": "행복주택",
   "region_scope": "전국",
-  "age_min": 19,
-  "age_max": 39,
-  "employment_condition": "청년, 대학생, 취업준비생",
-  "housing_condition": "무주택",
+  "employment_condition": "...",
+  "housing_condition": "...",
   "income_condition_text": "...",
-  "apply_start_date": null,
-  "apply_end_date": null,
   "apply_status": "안내중",
-  "source_org": "LH",
   "source_url": "...",
-  "summary": "...",
-  "source_type": "web_page"
+  "summary": "..."
 }
-### 청크 데이터
-{
-  "chunks": [
-    {
-      "chunk_id": "a10401020400_1",
-      "policy_id": "a10401020400",
-      "policy_name": "청년 전세임대주택",
-      "issuing_org": "LH",
-      "source_doc_name": "청년 전세임대주택",
-      "source_url": "...",
-      "section_title": "입주대상",
-      "chunk_text": "...",
-      "chunk_order": 1,
-      "has_table": false,
-      "doc_type": "web_page",
-      "created_from": "section_chunking"
-    }
-  ]
-}
-📌 4. 실행 방법
-python -m app.run_real_test
-
-📌 5. 결과 확인
-
-output/manual_test/
-raw_extraction.json (원본 추출 데이터)
-policy_schema.json (정책 데이터)
-chunk_schema.json (청크 데이터)
-
-📌 6. 백엔드 연동 방법
-🔹 정책 데이터 전송
-POST /api/policies
-Body:
-{ policy_schema }
-🔹 청크 데이터 전송
-POST /api/chunks
-
-Body:
-
-{
-  "chunks": [...]
-}
-📌 7. 협업 규칙
-🔹 필드명 규칙
-policy_name (title 사용 금지)
-source_url (url 사용 금지)
-🔹 타입 규칙
-age: int
-리스트: 배열 형태 유지
-🔹 Null 허용
-날짜 필드: null 가능
-
-📌 8. 디렉토리 구조
-app/
-├── fetchers/
-├── preprocess/
-├── extractors/
-├── mappers/
-├── pipeline.py
-├── run_real_test.py
-
-📌 9. 향후 개선
-소득 조건 정량화
-지역 정보 정밀화
-벡터 검색 연동
-사용자 조건 매칭 기능 추가
-
-📌 10. 담당 역할
-비정형 데이터 수집 및 정제
-텍스트 구조화 및 스키마 변환
-백엔드 연동용 데이터 제공
 ```
+
+---
+
+## 4. 변경 감지 시스템
+
+### 4.1 목적
+
+* 신규 정책 및 기존 정책 변경 사항 자동 탐지
+
+---
+
+### 4.2 감지 방식
+
+#### ① 고유 식별자 기반 비교
+
+* URL / policy_id 기반
+
+#### ② 내용 기반 비교
+
+* 정책 주요 필드를 결합하여 해시값 생성 (`content_hash`)
+* 이전 실행 결과와 비교하여 변경 여부 판단
+
+---
+
+### 4.3 결과 저장
+
+```text
+data/history/
+├─ latest_items.json
+├─ new_items_YYYY-MM-DD.json
+└─ updated_items_YYYY-MM-DD.json
+```
+
+---
+
+### 4.4 감지 결과 정의
+
+| 구분    | 설명                      |
+| ----- | ----------------------- |
+| 신규 정책 | 기존 데이터에 존재하지 않는 정책      |
+| 변경 정책 | 기존 정책과 동일하지만 내용이 변경된 경우 |
+
+---
+
+## 5. 자동 실행 구조
+
+### 5.1 실행 방식
+
+* `run_lh_pipeline.py` 실행 파일 구성
+* Windows Task Scheduler 활용
+
+---
+
+### 5.2 실행 주기
+
+* 월 1회 자동 실행
+
+---
+
+### 5.3 실행 흐름
+
+```text
+스케줄러 실행
+    ↓
+run_lh_pipeline.py
+    ↓
+데이터 수집 및 처리
+    ↓
+변경 감지 수행
+    ↓
+JSON 파일 저장
+```
+
+---
+
+## 6. 저장 구조
+
+### 6.1 출력 데이터
+
+```text
+output/
+└─ manual_test/
+   ├─ *_raw.json
+   ├─ *_policy.json
+   └─ *_chunks.json
+```
+
+---
+
+### 6.2 히스토리 데이터
+
+```text
+data/history/
+├─ latest_items.json
+├─ new_items_*.json
+└─ updated_items_*.json
+```
+
+---
+
+## 7. 기술 스택
+
+* Python
+* BeautifulSoup (HTML 파싱)
+* Requests (HTTP 요청)
+* JSON (데이터 저장)
+* Windows Task Scheduler (자동 실행)
+
+---
+
+## 8. 향후 확장 계획
+
+### 8.1 데이터베이스 연동
+
+* SQLite 기반 정책 데이터 저장
+* 중복 제거 및 데이터 관리
+
+
+## 9. 결론
+
+본 시스템은 LH 정책 데이터를 자동으로 수집하고,
+구조화 및 변경 감지까지 수행하는 데이터 파이프라인을 구축하였다.
+
+이를 통해 정책 데이터의 활용성과 확장성을 확보하였으며,
+향후 서비스화가 가능한 기반을 마련하였다.
+
+---
+
